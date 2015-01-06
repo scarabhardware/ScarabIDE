@@ -1,0 +1,275 @@
+<?xml version="1.0"?>
+<project name="Mojo IDE" default="build">
+  <!--echo message="os.name = ${os.name}" /-->
+  <!--echo message="os.arch = ${os.arch}" /-->
+  <!--echo message="os.version = ${os.version}" /-->
+  
+  <!-- Sets properties for macosx/windows/linux depending on current system -->
+  <condition property="macosx"><os family="mac" /></condition>
+  <condition property="windows"><os family="windows" /></condition>
+  <condition property="linux"><os family="unix" /></condition>
+  <condition property="linux32"><os family="unix" arch="i386" /></condition>
+  <condition property="linux64"><os family="unix" arch="amd64" /></condition>
+  
+  <condition property="platform" 
+	     value="macosx"><os family="mac" /></condition>
+  <condition property="platform" 
+	     value="windows"><os family="windows" /></condition>
+  <condition property="platform" 
+	     value="linux32"><os family="unix" arch="i386" /></condition>
+  <condition property="platform" 
+	     value="linux64"><os family="unix" arch="amd64" /></condition>
+
+  <!-- Libraries required for running mojo IDE -->
+  <fileset dir="." id="runtime.jars">
+    <include name="shared/mojo-ide.jar" />
+    <include name="shared/RXTXcomm.jar" />
+    <include name="shared/commons-io-2.4.jar" />
+    <include name="shared/jdom-2.0.5.jar" />
+    <include name="shared/antlr-runtime-4.2.jar" />
+  </fileset>
+
+  <target name="build" description="Build Mojo IDE.">
+    <antcall target="windows-build" />
+    <antcall target="linux32-build" />
+    <antcall target="linux64-build" />
+  </target>
+
+  <target name="dist" 
+	  description="Build Mojo IDE for distribution.">
+    <input message="Enter version number:" 
+	   addproperty="version"
+	   defaultvalue="1.0.0" />
+    <antcall target="linux-dist">
+       <param name="target.os" value="linux32" />
+    </antcall>
+    <antcall target="linux-dist">
+       <param name="target.os" value="linux64" />
+    </antcall>
+    <antcall target="windows-dist" />
+  </target>
+
+  <!-- "§$§$&, ant doesn't have a built-in help target :(  -->
+  <target name="help" description="Show project help">
+    <java classname="org.apache.tools.ant.Main">
+      <arg value="-p" />
+    </java>
+  </target>
+  
+
+  <!-- - - - - - - - - -->
+  <!-- Basic Assembly  -->
+  <!-- - - - - - - - - -->
+  
+  <target name="assemble">
+    <fail unless="target.path" 
+	  message="Do not call assemble from the command line." />
+
+	<copy todir="${target.path}">
+      <fileset file="shared/revisions.txt" />
+    </copy>
+
+    <copy todir="${target.path}">
+      <fileset file="shared/icon.png" />
+    </copy>
+    
+    <!-- copy shared base projects folder -->
+    <copy todir="${target.path}/base">
+      <fileset dir="shared/base" />
+    </copy>
+    
+    <!-- copy res folder -->
+    <copy todir="${target.path}/res">
+      <fileset dir="../res" />
+    </copy>
+  </target>
+
+  <!-- - - - - - - - - - - - - - - - - - -->
+  <!-- Subprojects: Core, App, Libraries -->
+  <!-- - - - - - - - - - - - - - - - - - -->
+  
+  <target name="subprojects-clean">
+    <subant buildpath=".." target="clean"/>
+  </target>
+  
+  <target name="subprojects-build">
+    <subant buildpath=".." target="build"/>
+  </target>
+
+  
+  <!-- - - - - - - - -->
+  <!-- Linux         -->
+  <!-- - - - - - - - -->
+  
+  <target name="linux-clean" depends="subprojects-clean" description="Clean linux version">
+    <delete dir="linux/work" />
+  </target>
+  
+  <target name="linux-build" depends="subprojects-build" description="Build linux version">
+    <fail unless="target.os" 
+	  message="Do not call linux-build from the command line." />
+    <mkdir dir="work/${target.os}" />
+
+    <copy todir="work/${target.os}/lib" flatten="true">
+      <fileset refid="runtime.jars" />
+    </copy>
+
+    <copy todir="work/${target.os}/lib">
+      <fileset file="lib/${target.os}/librxtxSerial.so" />
+    </copy>
+
+    <copy todir="work/${target.os}/lib">
+      <fileset file="lib/${target.os}/swt.jar" />
+    </copy>
+
+    <copy todir="work/${target.os}">
+      <fileset dir="linux" includes="driver/**" />
+    </copy>
+
+    <copy todir="work/${target.os}" file="linux/mojo-ide" />
+    <chmod perm="755" file="work/${target.os}/mojo-ide" />
+
+    <antcall target="assemble">
+      <param name="target.path" value="work/${target.os}" />
+    </antcall> 
+
+  </target>
+
+  <target name="linux32-build"  description="Build linux (32-bit) version">
+    <antcall target="linux-build">
+        <param name="target.os" value="linux32" />
+    </antcall>
+  </target>
+
+  <target name="linux64-build"  description="Build linux (64-bit) version">
+    <antcall target="linux-build">
+        <param name="target.os" value="linux64" />
+    </antcall>
+  </target>
+
+<target name="linux-dist" depends="build" 
+	  description="Build .tar.gz of linux version">
+
+    <move file="work/${target.os}" tofile="work/mojo-ide-${version}" />
+
+    <exec executable="tar" dir="work">
+      <arg value="-z"/>
+      <arg value="-c"/>
+      <arg value="-f"/>
+      <arg value="mojo-ide-${version}-${target.os}.tgz"/>
+      <arg value="mojo-ide-${version}"/>
+    </exec>
+
+    <move file="work/mojo-ide-${version}" tofile="work/${target.os}" />
+
+    <echo>
+      =======================================================
+      Mojo IDE for Linux was built. Grab the archive from   
+      
+      build/linux/mojo-ide-${version}-${target.os}.tgz
+      =======================================================
+    </echo>
+</target>
+  
+  
+  <!-- - - - - - - - -->
+  <!-- Windows       -->
+  <!-- - - - - - - - -->
+  
+  <target name="windows-clean" depends="subprojects-clean"
+	  description="Clean windows version">
+    <delete dir="work/windows" />
+  </target>
+  
+  
+  <target name="windows-build" depends="subprojects-build"
+	  description="Build windows version">
+    <mkdir dir="work/windows" />
+    
+    <!-- assemble the pde -->
+    <mkdir dir="work/windows/lib" />
+    <copy todir="work/windows/lib" flatten="true">
+      <fileset refid="runtime.jars" />
+    </copy>
+
+    <copy todir="work/windows/lib" flatten="true">
+      <fileset file="lib/windows32/swt.jar" />
+    </copy>
+    
+    <copy todir="work/windows">
+      <fileset file="shared/revisions.txt" />
+    </copy>
+    
+    <copy todir="work/windows">
+      <fileset file="lib/windows32/rxtxSerial.dll" />
+    </copy>
+
+    <copy todir="work/windows">
+      <fileset dir="windows" includes="driver/**" />
+    </copy>
+
+    <copy todir="work/windows">
+      <fileset dir="windows" includes="java/**" />
+    </copy>
+  	
+  	<copy todir="work/windows">
+  	      <fileset dir="windows" includes="MojoDriver.inf" />
+  	</copy>
+
+    <antcall target="assemble">
+      <param name="target.path" value="work/windows" />
+    </antcall> 
+
+    <property name="launch4j.dir" location="/opt/launch4j" />
+    <taskdef name="launch4j"
+        classname="net.sf.launch4j.ant.Launch4jTask"
+        classpath="${launch4j.dir}/launch4j.jar
+            :${launch4j.dir}/lib/xstream.jar" />
+
+    
+
+    <copy todir="work/windows">
+      <fileset dir="windows/launcher" 
+	       includes="config.xml"/>
+    </copy>
+    <launch4j configFile="work/windows/config.xml" />
+    <delete dir="work/windows" 
+	    includes="config.xml" />
+
+
+    <!-- cygwin requires html, dll, and exe to have the +x flag -->
+    <chmod perm="755">
+      <fileset dir="work/windows" includes="**/*.html, **/*.dll, **/*.exe" />
+    </chmod>
+  </target>
+
+<target name="windows-dist" depends="build" 
+	  description="Build .zip of windows version">
+
+    <move file="work/windows" tofile="work/mojo-ide-${version}" />
+
+    <exec executable="zip" dir="work">
+      <arg value="-r" />
+      <arg value="mojo-ide-${version}-windows.zip"/>
+      <arg value="mojo-ide-${version}"/>
+    </exec>
+
+    <move file="work/mojo-ide-${version}" tofile="work/windows" />
+
+    <echo>
+      =======================================================
+      Mojo IDE for Windows was built. Grab the archive from   
+      
+      build/linux/mojo-ide-${version}-windows.zip
+      =======================================================
+    </echo>
+</target>
+  
+
+  
+  <target name="clean" description="Perform a spring cleaning" 
+	  depends="subprojects-clean">
+     <delete dir="work" />
+  </target>
+
+</project>

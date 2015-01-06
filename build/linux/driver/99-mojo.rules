@@ -1,0 +1,3 @@
+SUBSYSTEM=="usb", ACTION=="add", ATTRS{idVendor}=="29dd", MODE="666"
+ATTRS{idVendor}=="29dd", ATTRS{idProduct}=="8001", ENV{ID_MM_DEVICE_IGNORE}="1"
+ATTRS{idVendor}=="29dd", ATTRS{idProduct}=="0001", ENV{ID_MM_DEVICE_IGNORE}="1"
