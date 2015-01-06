@@ -1,6 +1,6 @@
 ScarabIDE is based on Mojo IDE https://github.com/embmicro/mojo-ide
 
-SOme parts in the code are not working yet. 
+Some parts in the code are not working yet. 
 
 Copyright (C) 2014-2015 Scarab Hardware
 
